@@ -1,0 +1,24 @@
+site_name: Quantmaster
+site_description: Features quantitativas para algorithmic trading
+repo_url: https://github.com/wolfox33/quantmaster
+site_url: https://wolfox33.github.io/quantmaster/
+
+theme:
+  name: material
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+
+nav:
+  - Home: index.md
+  - Features:
+      - Overview: features/index.md
+      - Momentum:
+          - RSI: features/momentum/rsi.md
+      - Volatility:
+          - HAR-RV: features/volatility/har_rv.md
