@@ -22,3 +22,5 @@ nav:
           - RSI: features/momentum/rsi.md
       - Volatility:
           - HAR-RV: features/volatility/har_rv.md
+      - Volume:
+          - RVOL: features/volume/rvol.md
