@@ -22,5 +22,10 @@ nav:
           - RSI: features/momentum/rsi.md
       - Volatility:
           - HAR-RV: features/volatility/har_rv.md
+          - HAR-RV Forecast: features/volatility/har_rv_forecast.md
+          - Yang–Zhang Volatility: features/volatility/yang_zhang_volatility.md
+      - Statistical:
+          - FracDiff: features/statistical/fracdiff.md
+          - Hurst (DFA): features/statistical/hurst_dfa.md
       - Volume:
           - RVOL: features/volume/rvol.md
