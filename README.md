@@ -18,6 +18,20 @@ df["rsi_10"] = rsi(df, window=10)
 df = df.join(har_rv(df))
 ```
 
+## Importar features de uma vez
+
+Se você quiser importar várias features sem ficar apontando para cada submódulo, use o namespace `quantmaster.features` (exporta as features públicas em `__all__`):
+
+```python
+from quantmaster.features import rsi, har_rv, yang_zhang_volatility, hurst_dfa
+```
+
+Você também pode fazer import wildcard (não recomendado em código de produção, mas útil em notebooks):
+
+```python
+from quantmaster.features import *
+```
+
 ## Estrutura
 
 - Features ficam em `src/quantmaster/features/` separadas por categoria (Momentum, Trend, Volatility, etc.).
