@@ -178,3 +178,91 @@ def hurst_dfa(
 
     out.iloc[window - 1 :] = hurst
     return out
+
+
+def ornstein_uhlenbeck(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 240,
+    detrend_window: int = 48,
+    price_col: str = "close",
+) -> pd.DataFrame:
+    window = validate_positive_int(window, name="window")
+    detrend_window = validate_positive_int(detrend_window, name="detrend_window")
+
+    if window < 8:
+        raise ValueError(f"window must be >= 8, got {window}")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    log_p = np.log(price.where(price > 0))
+    x = log_p - log_p.rolling(detrend_window).mean()
+
+    out = pd.DataFrame(index=price.index)
+    out[f"ou_phi_{window}"] = np.nan
+    out[f"ou_kappa_{window}"] = np.nan
+    out[f"ou_theta_{window}"] = np.nan
+    out[f"ou_sigma_{window}"] = np.nan
+    out[f"ou_sigma_eq_{window}"] = np.nan
+    out[f"ou_halflife_{window}"] = np.nan
+    out[f"ou_zscore_{window}"] = np.nan
+
+    if len(x) < window:
+        return out
+
+    x_arr = x.to_numpy(dtype=float)
+    windows = np.lib.stride_tricks.sliding_window_view(x_arr, window_shape=window)
+
+    x_prev = windows[:, :-1]
+    y = windows[:, 1:]
+    mask = np.isfinite(x_prev) & np.isfinite(y)
+
+    x_prev_m = np.where(mask, x_prev, np.nan)
+    y_m = np.where(mask, y, np.nan)
+
+    n_eff = np.sum(mask, axis=1)
+    min_obs = max(10, (window - 1) // 2)
+    valid_n = n_eff >= min_obs
+
+    mean_x = np.nanmean(x_prev_m, axis=1)
+    mean_y = np.nanmean(y_m, axis=1)
+
+    x_c = x_prev - mean_x[:, None]
+    y_c = y - mean_y[:, None]
+
+    cov_xy = np.nanmean(np.where(mask, x_c * y_c, np.nan), axis=1)
+    var_x = np.nanmean(np.where(mask, x_c * x_c, np.nan), axis=1)
+
+    phi = cov_xy / var_x
+    phi = np.where(valid_n & np.isfinite(phi), phi, np.nan)
+
+    c = mean_y - phi * mean_x
+
+    phi_valid = (phi > 0.0) & (phi < 1.0)
+    kappa = np.where(phi_valid, -np.log(phi), np.nan)
+
+    theta = np.where(phi_valid, c / (1.0 - phi), np.nan)
+
+    pred = c[:, None] + phi[:, None] * x_prev
+    resid = np.where(mask, y - pred, np.nan)
+    resid_var = np.nanmean(resid * resid, axis=1)
+
+    one_minus_phi2 = 1.0 - phi * phi
+    sigma_eq2 = np.where(phi_valid & (one_minus_phi2 > 0.0), resid_var / one_minus_phi2, np.nan)
+    sigma_eq = np.sqrt(sigma_eq2)
+    sigma = np.where(phi_valid & np.isfinite(kappa), sigma_eq * np.sqrt(2.0 * kappa), np.nan)
+
+    halflife = np.where(phi_valid & (kappa > 0.0), np.log(2.0) / kappa, np.nan)
+
+    x_t = windows[:, -1]
+    zscore = np.where(phi_valid & (sigma_eq > 0.0), (x_t - theta) / sigma_eq, np.nan)
+
+    start = window - 1
+    out.iloc[start:, out.columns.get_loc(f"ou_phi_{window}")] = phi
+    out.iloc[start:, out.columns.get_loc(f"ou_kappa_{window}")] = kappa
+    out.iloc[start:, out.columns.get_loc(f"ou_theta_{window}")] = theta
+    out.iloc[start:, out.columns.get_loc(f"ou_sigma_{window}")] = sigma
+    out.iloc[start:, out.columns.get_loc(f"ou_sigma_eq_{window}")] = sigma_eq
+    out.iloc[start:, out.columns.get_loc(f"ou_halflife_{window}")] = halflife
+    out.iloc[start:, out.columns.get_loc(f"ou_zscore_{window}")] = zscore
+
+    return out

@@ -27,5 +27,6 @@ nav:
       - Statistical:
           - FracDiff: features/statistical/fracdiff.md
           - Hurst (DFA): features/statistical/hurst_dfa.md
+          - Ornstein–Uhlenbeck: features/statistical/ornstein_uhlenbeck.md
       - Volume:
           - RVOL: features/volume/rvol.md
