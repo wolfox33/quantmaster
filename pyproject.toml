@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantmaster"
-version = "0.1.0"
+version = "0.1.1"
 description = "Biblioteca de features quantitativas para algorithmic trading (OHLCV -> features)."
 readme = "README.md"
 license = { file = "LICENSE" }
