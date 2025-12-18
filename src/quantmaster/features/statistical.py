@@ -266,3 +266,481 @@ def ornstein_uhlenbeck(
     out.iloc[start:, out.columns.get_loc(f"ou_zscore_{window}")] = zscore
 
     return out
+
+
+def _beta_from_windows(x: np.ndarray, y: np.ndarray) -> float:
+    mask = np.isfinite(x) & np.isfinite(y)
+    if mask.sum() < 2:
+        return float("nan")
+
+    x_m = x[mask]
+    y_m = y[mask]
+
+    x_mean = float(x_m.mean())
+    y_mean = float(y_m.mean())
+    x_c = x_m - x_mean
+    y_c = y_m - y_mean
+
+    denom = float(np.sum(y_c * y_c))
+    if denom == 0.0:
+        return float("nan")
+
+    return float(np.sum(x_c * y_c) / denom)
+
+
+def rolling_beta(
+    data: pd.DataFrame | pd.Series,
+    benchmark: pd.Series,
+    *,
+    window: int = 60,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    asset_price = get_price_series(data, price_col=price_col).astype(float)
+    bench_price = pd.to_numeric(benchmark, errors="coerce").astype(float)
+
+    if log_returns:
+        r_asset = np.log(asset_price.where(asset_price > 0)).diff()
+        r_bench = np.log(bench_price.where(bench_price > 0)).diff()
+    else:
+        r_asset = asset_price.pct_change()
+        r_bench = bench_price.pct_change()
+
+    df = pd.concat([r_asset.rename("asset"), r_bench.rename("bench")], axis=1)
+    out = pd.Series(np.nan, index=df.index, dtype=float)
+    out.name = f"rolling_beta_{window}"
+
+    if len(df) < window:
+        return out
+
+    x = df["asset"].to_numpy(dtype=float)
+    y = df["bench"].to_numpy(dtype=float)
+
+    xw = np.lib.stride_tricks.sliding_window_view(x, window_shape=window)
+    yw = np.lib.stride_tricks.sliding_window_view(y, window_shape=window)
+
+    beta_arr = np.full(xw.shape[0], np.nan, dtype=float)
+    for i in range(xw.shape[0]):
+        beta_arr[i] = _beta_from_windows(xw[i], yw[i])
+
+    out.iloc[window - 1 :] = beta_arr
+    return out
+
+
+def downside_beta(
+    data: pd.DataFrame | pd.Series,
+    benchmark: pd.Series,
+    *,
+    window: int = 60,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    asset_price = get_price_series(data, price_col=price_col).astype(float)
+    bench_price = pd.to_numeric(benchmark, errors="coerce").astype(float)
+
+    if log_returns:
+        r_asset = np.log(asset_price.where(asset_price > 0)).diff()
+        r_bench = np.log(bench_price.where(bench_price > 0)).diff()
+    else:
+        r_asset = asset_price.pct_change()
+        r_bench = bench_price.pct_change()
+
+    df = pd.concat([r_asset.rename("asset"), r_bench.rename("bench")], axis=1)
+    out = pd.Series(np.nan, index=df.index, dtype=float)
+    out.name = f"downside_beta_{window}"
+
+    if len(df) < window:
+        return out
+
+    x = df["asset"].to_numpy(dtype=float)
+    y = df["bench"].to_numpy(dtype=float)
+
+    xw = np.lib.stride_tricks.sliding_window_view(x, window_shape=window)
+    yw = np.lib.stride_tricks.sliding_window_view(y, window_shape=window)
+
+    beta_arr = np.full(xw.shape[0], np.nan, dtype=float)
+    for i in range(xw.shape[0]):
+        mask = np.isfinite(xw[i]) & np.isfinite(yw[i]) & (yw[i] < 0.0)
+        if mask.sum() < 2:
+            continue
+        beta_arr[i] = _beta_from_windows(xw[i][mask], yw[i][mask])
+
+    out.iloc[window - 1 :] = beta_arr
+    return out
+
+
+def information_discreteness(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 20,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+
+    if log_returns:
+        rets = np.log(price).diff()
+    else:
+        rets = price.pct_change()
+
+    out = pd.Series(np.nan, index=price.index, dtype=float)
+    out.name = f"information_discreteness_{window}"
+
+    if len(rets) < window:
+        return out
+
+    r = rets.to_numpy(dtype=float)
+    rw = np.lib.stride_tricks.sliding_window_view(r, window_shape=window)
+
+    id_arr = np.full(rw.shape[0], np.nan, dtype=float)
+    for i in range(rw.shape[0]):
+        w = rw[i]
+        w = w[np.isfinite(w)]
+        if w.size < 2:
+            continue
+
+        r_total = float(np.sum(w))
+        s_total = float(np.sign(r_total))
+        if s_total == 0.0:
+            id_arr[i] = 0.0
+            continue
+
+        s = np.sign(w)
+        s = s[s != 0.0]
+        if s.size == 0:
+            continue
+
+        same = float(np.mean(s == s_total))
+        opp = float(np.mean(s == -s_total))
+        id_arr[i] = s_total * (same - opp)
+
+    out.iloc[window - 1 :] = id_arr
+    return out
+
+
+def realized_skewness(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 20,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+
+    if log_returns:
+        r = np.log(price).diff()
+    else:
+        r = price.pct_change()
+
+    m2 = r.pow(2).rolling(window).sum()
+    m3 = r.pow(3).rolling(window).sum()
+
+    denom = m2.pow(1.5)
+    out = np.sqrt(float(window)) * m3 / denom.where(denom > 0)
+    out.name = f"realized_skewness_{window}"
+    return out
+
+
+def realized_kurtosis(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 20,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+
+    if log_returns:
+        r = np.log(price).diff()
+    else:
+        r = price.pct_change()
+
+    m2 = r.pow(2).rolling(window).sum()
+    m4 = r.pow(4).rolling(window).sum()
+
+    denom = m2.pow(2)
+    out = float(window) * m4 / denom.where(denom > 0)
+    out.name = f"realized_kurtosis_{window}"
+    return out
+
+
+def _validate_positive_int_local(value: int, *, name: str) -> int:
+    return validate_positive_int(value, name=name)
+
+
+def _validate_r(r: float) -> float:
+    try:
+        r = float(r)
+    except (TypeError, ValueError) as exc:
+        raise TypeError(f"r must be float, got {type(r).__name__}") from exc
+    if r <= 0:
+        raise ValueError(f"r must be > 0, got {r}")
+    return r
+
+
+def _validate_m(m: int) -> int:
+    if not isinstance(m, int):
+        raise TypeError(f"m must be int, got {type(m).__name__}")
+    if m < 1:
+        raise ValueError(f"m must be >= 1, got {m}")
+    return m
+
+
+def _count_matches_upper(emb: np.ndarray, tol: float) -> int:
+    k = emb.shape[0]
+    if k < 2:
+        return 0
+
+    cnt = 0
+    for i in range(k - 1):
+        dist = np.max(np.abs(emb[i + 1 :] - emb[i]), axis=1)
+        cnt += int(np.sum(dist <= tol))
+    return cnt
+
+
+def _sample_entropy_1d(x: np.ndarray, *, m: int, tol: float) -> float:
+    n = x.size
+    if n < m + 2:
+        return float("nan")
+
+    if not np.isfinite(x).all():
+        return float("nan")
+
+    emb_m = np.lib.stride_tricks.sliding_window_view(x, window_shape=m)
+    emb_m1 = np.lib.stride_tricks.sliding_window_view(x, window_shape=m + 1)
+
+    b = _count_matches_upper(emb_m, tol)
+    a = _count_matches_upper(emb_m1, tol)
+
+    if b <= 0 or a <= 0:
+        return float("nan")
+
+    return float(-np.log(a / b))
+
+
+def _approximate_entropy_1d(x: np.ndarray, *, m: int, tol: float) -> float:
+    n = x.size
+    if n < m + 2:
+        return float("nan")
+
+    if not np.isfinite(x).all():
+        return float("nan")
+
+    emb_m = np.lib.stride_tricks.sliding_window_view(x, window_shape=m)
+    emb_m1 = np.lib.stride_tricks.sliding_window_view(x, window_shape=m + 1)
+
+    k_m = emb_m.shape[0]
+    k_m1 = emb_m1.shape[0]
+
+    c_m = np.empty(k_m, dtype=float)
+    for i in range(k_m):
+        dist = np.max(np.abs(emb_m - emb_m[i]), axis=1)
+        c_m[i] = np.sum(dist <= tol) / float(k_m)
+
+    c_m1 = np.empty(k_m1, dtype=float)
+    for i in range(k_m1):
+        dist = np.max(np.abs(emb_m1 - emb_m1[i]), axis=1)
+        c_m1[i] = np.sum(dist <= tol) / float(k_m1)
+
+    if not (c_m > 0).all() or not (c_m1 > 0).all():
+        return float("nan")
+
+    phi_m = float(np.mean(np.log(c_m)))
+    phi_m1 = float(np.mean(np.log(c_m1)))
+    return phi_m - phi_m1
+
+
+def _permutation_entropy_1d(x: np.ndarray, *, order: int, delay: int) -> float:
+    n = x.size
+    span = (order - 1) * delay + 1
+    if n < span:
+        return float("nan")
+    if not np.isfinite(x).all():
+        return float("nan")
+
+    windows = np.lib.stride_tricks.sliding_window_view(x, window_shape=span)
+    emb = windows[:, ::delay]
+
+    ranks = np.argsort(np.argsort(emb, axis=1, kind="mergesort"), axis=1, kind="mergesort")
+
+    base = int(order)
+    weights = (base ** np.arange(order, dtype=np.int64)).astype(np.int64)
+    codes = (ranks.astype(np.int64) * weights[None, :]).sum(axis=1)
+
+    _, counts = np.unique(codes, return_counts=True)
+    p = counts.astype(float) / float(counts.sum())
+    return float(-np.sum(p * np.log(p)))
+
+
+def _cross_sample_entropy_1d(x1: np.ndarray, x2: np.ndarray, *, m: int, tol: float) -> float:
+    if x1.size != x2.size:
+        return float("nan")
+    n = x1.size
+    if n < m + 2:
+        return float("nan")
+    if not np.isfinite(x1).all() or not np.isfinite(x2).all():
+        return float("nan")
+
+    emb1_m = np.lib.stride_tricks.sliding_window_view(x1, window_shape=m)
+    emb2_m = np.lib.stride_tricks.sliding_window_view(x2, window_shape=m)
+    emb1_m1 = np.lib.stride_tricks.sliding_window_view(x1, window_shape=m + 1)
+    emb2_m1 = np.lib.stride_tricks.sliding_window_view(x2, window_shape=m + 1)
+
+    b = 0
+    for i in range(emb1_m.shape[0]):
+        dist = np.max(np.abs(emb2_m - emb1_m[i]), axis=1)
+        b += int(np.sum(dist <= tol))
+
+    a = 0
+    for i in range(emb1_m1.shape[0]):
+        dist = np.max(np.abs(emb2_m1 - emb1_m1[i]), axis=1)
+        a += int(np.sum(dist <= tol))
+
+    if b <= 0 or a <= 0:
+        return float("nan")
+
+    return float(-np.log(a / b))
+
+
+def sample_entropy(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 100,
+    m: int = 2,
+    r: float = 0.2,
+    price_col: str = "close",
+) -> pd.Series:
+    window = _validate_positive_int_local(window, name="window")
+    m = _validate_m(m)
+    r = _validate_r(r)
+
+    x = get_price_series(data, price_col=price_col).astype(float)
+    out = pd.Series(np.nan, index=x.index, dtype=float)
+    out.name = f"sample_entropy_{window}"
+
+    if len(x) < window:
+        return out
+
+    x_arr = x.to_numpy(dtype=float)
+    for i in range(window - 1, len(x_arr)):
+        win = x_arr[i - window + 1 : i + 1]
+        if not np.isfinite(win).all():
+            continue
+        tol = r * float(np.std(win))
+        out.iat[i] = _sample_entropy_1d(win, m=m, tol=tol)
+
+    return out
+
+
+def approximate_entropy(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 100,
+    m: int = 2,
+    r: float = 0.2,
+    price_col: str = "close",
+) -> pd.Series:
+    window = _validate_positive_int_local(window, name="window")
+    m = _validate_m(m)
+    r = _validate_r(r)
+
+    x = get_price_series(data, price_col=price_col).astype(float)
+    out = pd.Series(np.nan, index=x.index, dtype=float)
+    out.name = f"approximate_entropy_{window}"
+
+    if len(x) < window:
+        return out
+
+    x_arr = x.to_numpy(dtype=float)
+    for i in range(window - 1, len(x_arr)):
+        win = x_arr[i - window + 1 : i + 1]
+        if not np.isfinite(win).all():
+            continue
+        tol = r * float(np.std(win))
+        out.iat[i] = _approximate_entropy_1d(win, m=m, tol=tol)
+
+    return out
+
+
+def permutation_entropy(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 100,
+    order: int = 3,
+    delay: int = 1,
+    price_col: str = "close",
+) -> pd.Series:
+    window = _validate_positive_int_local(window, name="window")
+    order = _validate_positive_int_local(order, name="order")
+    delay = _validate_positive_int_local(delay, name="delay")
+    if order < 2:
+        raise ValueError(f"order must be >= 2, got {order}")
+    if order > 8:
+        raise ValueError(f"order must be <= 8, got {order}")
+
+    x = get_price_series(data, price_col=price_col).astype(float)
+    out = pd.Series(np.nan, index=x.index, dtype=float)
+    out.name = f"permutation_entropy_{window}_{order}_{delay}"
+
+    if len(x) < window:
+        return out
+
+    x_arr = x.to_numpy(dtype=float)
+    for i in range(window - 1, len(x_arr)):
+        win = x_arr[i - window + 1 : i + 1]
+        out.iat[i] = _permutation_entropy_1d(win, order=order, delay=delay)
+
+    return out
+
+
+def cross_sample_entropy(
+    data1: pd.Series,
+    data2: pd.Series,
+    *,
+    window: int = 100,
+    m: int = 2,
+    r: float = 0.2,
+) -> pd.Series:
+    window = _validate_positive_int_local(window, name="window")
+    m = _validate_m(m)
+    r = _validate_r(r)
+
+    s1 = pd.to_numeric(data1, errors="coerce").astype(float)
+    s2 = pd.to_numeric(data2, errors="coerce").astype(float)
+
+    df = pd.concat([s1.rename("x"), s2.rename("y")], axis=1)
+
+    out = pd.Series(np.nan, index=df.index, dtype=float)
+    out.name = f"cross_sample_entropy_{window}"
+
+    if len(df) < window:
+        return out
+
+    x1 = df["x"].to_numpy(dtype=float)
+    x2 = df["y"].to_numpy(dtype=float)
+
+    for i in range(window - 1, len(df)):
+        w1 = x1[i - window + 1 : i + 1]
+        w2 = x2[i - window + 1 : i + 1]
+        if not np.isfinite(w1).all() or not np.isfinite(w2).all():
+            continue
+        std = float(np.std(np.concatenate([w1, w2])))
+        if not np.isfinite(std):
+            continue
+        tol = r * std
+        out.iat[i] = _cross_sample_entropy_1d(w1, w2, m=m, tol=tol)
+
+    return out

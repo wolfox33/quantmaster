@@ -20,13 +20,64 @@ nav:
       - Overview: features/index.md
       - Momentum:
           - RSI: features/momentum/rsi.md
+          - Time-Series Momentum: features/momentum/time_series_momentum.md
+          - Chande Momentum Oscillator: features/momentum/chande_momentum_oscillator.md
       - Volatility:
           - HAR-RV: features/volatility/har_rv.md
           - HAR-RV Forecast: features/volatility/har_rv_forecast.md
+          - Parkinson Volatility: features/volatility/parkinson_volatility.md
+          - Garman–Klass Volatility: features/volatility/garman_klass_volatility.md
+          - Rogers–Satchell Volatility: features/volatility/rogers_satchell_volatility.md
+          - Intraday Range: features/volatility/intraday_range.md
+          - Volatility Ratio: features/volatility/volatility_ratio.md
           - Yang–Zhang Volatility: features/volatility/yang_zhang_volatility.md
+          - Bipower Variation: features/volatility/bipower_variation.md
+          - Jump Variation: features/volatility/jump_variation.md
+          - Realized Semivariance: features/volatility/realized_semivariance.md
+          - Signed Jump Variation: features/volatility/signed_jump_variation.md
+          - MinRV: features/volatility/minrv.md
+          - MedRV: features/volatility/medrv.md
+          - Realized Quarticity: features/volatility/realized_quarticity.md
+          - HARQ Adjustment: features/volatility/harq_adjustment.md
+          - SHAR Components: features/volatility/shar_components.md
+          - Realized Roughness: features/volatility/realized_roughness.md
+          - Log Volatility Increment: features/volatility/log_volatility_increment.md
+      - Microstructure:
+          - Amihud Illiquidity: features/microstructure/amihud_illiquidity.md
+          - Roll Spread: features/microstructure/roll_spread.md
+          - Corwin–Schultz Spread: features/microstructure/corwin_schultz_spread.md
+          - Relative Spread Proxy: features/microstructure/relative_spread_proxy.md
       - Statistical:
           - FracDiff: features/statistical/fracdiff.md
           - Hurst (DFA): features/statistical/hurst_dfa.md
           - Ornstein–Uhlenbeck: features/statistical/ornstein_uhlenbeck.md
+          - Rolling Beta: features/statistical/rolling_beta.md
+          - Downside Beta: features/statistical/downside_beta.md
+          - Information Discreteness: features/statistical/information_discreteness.md
+          - Realized Skewness: features/statistical/realized_skewness.md
+          - Realized Kurtosis: features/statistical/realized_kurtosis.md
+          - Sample Entropy: features/statistical/sample_entropy.md
+          - Approximate Entropy: features/statistical/approximate_entropy.md
+          - Permutation Entropy: features/statistical/permutation_entropy.md
+          - Cross Sample Entropy: features/statistical/cross_sample_entropy.md
+      - Trend:
+          - Trend Intensity: features/trend/trend_intensity.md
+          - Kaufman Efficiency Ratio: features/trend/kaufman_efficiency_ratio.md
+          - Price Acceleration: features/trend/price_acceleration.md
+          - Trend Strength Indicator: features/trend/trend_strength_indicator.md
+          - Trend Strength Autocorr: features/trend/trend_strength_autocorr.md
+      - Regime:
+          - CUSUM Statistic: features/regime/cusum_statistic.md
+          - Variance Ratio: features/regime/variance_ratio.md
+          - Market Efficiency Index: features/regime/market_efficiency_index.md
+          - Runs Test Statistic: features/regime/runs_test_statistic.md
+      - Returns:
+          - Overnight Gap: features/returns/overnight_gap.md
+          - Intraday Return: features/returns/intraday_return.md
+      - Risk:
+          - Value at Risk (Historical): features/risk/value_at_risk_historical.md
+          - Expected Shortfall: features/risk/expected_shortfall.md
+          - Tail Risk Measure: features/risk/tail_risk_measure.md
+          - Max Drawdown Duration: features/risk/max_drawdown_duration.md
       - Volume:
           - RVOL: features/volume/rvol.md
