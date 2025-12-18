@@ -1,20 +1,28 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from tests.helpers import assert_no_lookahead
 
 from quantmaster.features.statistical import (
+    absolute_return_autocorrelation,
     approximate_entropy,
     cross_sample_entropy,
+    fractal_dimension_mincover,
     fracdiff,
+    generalized_hurst_exponent,
     hurst_dfa,
     information_discreteness,
     downside_beta,
+    mean_reversion_half_life,
     ornstein_uhlenbeck,
+    path_signature_features,
     permutation_entropy,
     realized_kurtosis,
     realized_skewness,
+    return_autocorrelation,
     rolling_beta,
+    spread_zscore,
     sample_entropy,
 )
 
@@ -202,6 +210,43 @@ def test_rolling_beta_shape_name_and_no_lookahead() -> None:
     assert_no_lookahead(feature_fn=_fn, data=df, t=120, feature_kwargs={"window": 60})
 
 
+def test_path_signature_features_shape_and_no_lookahead() -> None:
+    iisignature = pytest.importorskip("iisignature")
+
+    idx = pd.date_range("2024-01-01", periods=120, freq="D")
+    df = pd.DataFrame(
+        {
+            "open": 100.0 + np.linspace(0, 2, len(idx)),
+            "high": 101.0 + np.linspace(0, 2, len(idx)),
+            "low": 99.0 + np.linspace(0, 2, len(idx)),
+            "close": 100.5 + np.linspace(0, 2, len(idx)),
+            "volume": 1000.0 + np.linspace(0, 10, len(idx)),
+        },
+        index=idx,
+    )
+
+    depth = 2
+    window = 20
+    sig_len = int(iisignature.siglength(5, depth))
+
+    out = path_signature_features(df, depth=depth, window=window)
+
+    assert isinstance(out, pd.DataFrame)
+    assert out.index.equals(df.index)
+    assert out.shape == (len(df), sig_len)
+    assert list(out.columns) == [f"path_sig_{depth}_{k}" for k in range(sig_len)]
+
+    valid = out.dropna()
+    assert np.isfinite(valid.to_numpy(dtype=float)).all()
+
+    assert_no_lookahead(
+        feature_fn=path_signature_features,
+        data=df,
+        t=60,
+        feature_kwargs={"depth": depth, "window": window},
+    )
+
+
 def test_downside_beta_shape_name_and_no_lookahead() -> None:
     idx = pd.date_range("2024-01-01", periods=260, freq="D")
     asset = pd.Series(100.0 + np.cumsum(np.sin(np.linspace(0, 12, len(idx))) * 0.2), index=idx)
@@ -274,3 +319,140 @@ def test_realized_kurtosis_shape_name_and_no_lookahead() -> None:
     assert np.isfinite(valid).all()
 
     assert_no_lookahead(feature_fn=realized_kurtosis, data=df, t=80, feature_kwargs={"window": 20})
+
+
+def test_return_autocorrelation_shape_name_and_no_lookahead() -> None:
+    idx = pd.date_range("2024-01-01", periods=260, freq="D")
+    close = pd.Series(100.0 + np.cumsum(np.sin(np.linspace(0, 14, len(idx))) * 0.2), index=idx)
+    df = pd.DataFrame({"close": close}, index=idx)
+
+    out = return_autocorrelation(df, window=60, lag=1)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(df.index)
+    assert out.name == "return_autocorrelation_60_1"
+
+    valid = out.dropna()
+    assert np.isfinite(valid).all()
+    assert (valid >= -1.0 - 1e-12).all()
+    assert (valid <= 1.0 + 1e-12).all()
+
+    assert_no_lookahead(
+        feature_fn=return_autocorrelation,
+        data=df,
+        t=120,
+        feature_kwargs={"window": 60, "lag": 1},
+    )
+
+
+def test_absolute_return_autocorrelation_shape_name_and_no_lookahead() -> None:
+    idx = pd.date_range("2024-01-01", periods=260, freq="D")
+    close = pd.Series(100.0 + np.cumsum(np.sin(np.linspace(0, 14, len(idx))) * 0.2), index=idx)
+    df = pd.DataFrame({"close": close}, index=idx)
+
+    out = absolute_return_autocorrelation(df, window=60, lag=1)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(df.index)
+    assert out.name == "absolute_return_autocorrelation_60_1"
+
+    valid = out.dropna()
+    assert np.isfinite(valid).all()
+    assert (valid >= -1.0 - 1e-12).all()
+    assert (valid <= 1.0 + 1e-12).all()
+
+    assert_no_lookahead(
+        feature_fn=absolute_return_autocorrelation,
+        data=df,
+        t=120,
+        feature_kwargs={"window": 60, "lag": 1},
+    )
+
+
+def test_generalized_hurst_exponent_shape_name_and_no_lookahead() -> None:
+    idx = pd.date_range("2024-01-01", periods=260, freq="D")
+    close = pd.Series(100.0 + np.cumsum(np.sin(np.linspace(0, 20, len(idx))) * 0.3), index=idx)
+    df = pd.DataFrame({"close": close}, index=idx)
+
+    out = generalized_hurst_exponent(df, window=100, q=2.0, max_lag=10)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(df.index)
+    assert out.name == "generalized_hurst_exponent_100_2_10"
+
+    valid = out.dropna()
+    assert np.isfinite(valid).all()
+
+    assert_no_lookahead(
+        feature_fn=generalized_hurst_exponent,
+        data=df,
+        t=150,
+        feature_kwargs={"window": 100, "q": 2.0, "max_lag": 10},
+    )
+
+
+def test_fractal_dimension_mincover_shape_name_and_no_lookahead() -> None:
+    idx = pd.date_range("2024-01-01", periods=260, freq="D")
+    close = pd.Series(100.0 + np.cumsum(np.sin(np.linspace(0, 20, len(idx))) * 0.3), index=idx)
+    df = pd.DataFrame({"close": close}, index=idx)
+
+    out = fractal_dimension_mincover(df, window=100, max_scale=10)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(df.index)
+    assert out.name == "fractal_dimension_mincover_100_10"
+
+    valid = out.dropna()
+    assert np.isfinite(valid).all()
+    assert (valid > 0).all()
+
+    assert_no_lookahead(
+        feature_fn=fractal_dimension_mincover,
+        data=df,
+        t=150,
+        feature_kwargs={"window": 100, "max_scale": 10},
+    )
+
+
+def test_mean_reversion_half_life_shape_name_and_no_lookahead() -> None:
+    idx = pd.date_range("2024-01-01", periods=260, freq="D")
+    close = pd.Series(100.0 + np.cumsum(np.sin(np.linspace(0, 20, len(idx))) * 0.3), index=idx)
+    df = pd.DataFrame({"close": close}, index=idx)
+
+    out = mean_reversion_half_life(df, window=60)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(df.index)
+    assert out.name == "mean_reversion_half_life_60"
+
+    valid = out.dropna()
+    assert np.isfinite(valid).all()
+    assert (valid > 0).all()
+
+    assert_no_lookahead(
+        feature_fn=mean_reversion_half_life,
+        data=df,
+        t=120,
+        feature_kwargs={"window": 60},
+    )
+
+
+def test_spread_zscore_shape_name_and_no_lookahead() -> None:
+    idx = pd.date_range("2024-01-01", periods=260, freq="D")
+    asset = pd.Series(100.0 + np.cumsum(np.sin(np.linspace(0, 16, len(idx))) * 0.25), index=idx)
+    bench = pd.Series(200.0 + np.cumsum(np.cos(np.linspace(0, 16, len(idx))) * 0.2), index=idx)
+    df = pd.DataFrame({"close": asset, "bench": bench}, index=idx)
+
+    def _fn(d: pd.DataFrame, *, window: int) -> pd.Series:
+        return spread_zscore(d, d["bench"], window=window)
+
+    out = _fn(df, window=60)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(df.index)
+    assert out.name == "spread_zscore_60"
+
+    valid = out.dropna()
+    assert np.isfinite(valid).all()
+
+    assert_no_lookahead(feature_fn=_fn, data=df, t=120, feature_kwargs={"window": 60})

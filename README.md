@@ -13,9 +13,13 @@ pip install -e ".[dev]"
 ```python
 from quantmaster.features.momentum import rsi
 from quantmaster.features.volatility import har_rv
+from quantmaster.features.utils import create_all
 
 df["rsi_10"] = rsi(df, window=10)
 df = df.join(har_rv(df))
+
+# gerar várias features de uma vez (com defaults)
+df = create_all(df)
 ```
 
 ## Importar features de uma vez

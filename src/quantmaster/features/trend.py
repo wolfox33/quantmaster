@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from quantmaster.features.utils import get_price_series, validate_positive_int
+from quantmaster.features.utils import get_price_series, validate_columns, validate_positive_int
 
 
 def trend_intensity(
@@ -112,4 +112,98 @@ def trend_strength_autocorr(
 
     out = rets.rolling(window).corr(rets.shift(lag))
     out.name = f"trend_strength_autocorr_{window}_{lag}"
+    return out
+
+
+def bar_range_position(
+    data: pd.DataFrame,
+    *,
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+) -> pd.Series:
+    validate_columns(data, required=[open_col, high_col, low_col, close_col])
+
+    o = pd.to_numeric(data[open_col], errors="coerce").astype(float)
+    h = pd.to_numeric(data[high_col], errors="coerce").astype(float)
+    l = pd.to_numeric(data[low_col], errors="coerce").astype(float)
+    c = pd.to_numeric(data[close_col], errors="coerce").astype(float)
+
+    rng = h - l
+    out = (c - l) / rng.where(rng != 0)
+    out = out.where(rng != 0, 0.5)
+    out = out.clip(lower=0.0, upper=1.0)
+    out.name = "bar_range_position"
+    return out
+
+
+def body_to_range_ratio(
+    data: pd.DataFrame,
+    *,
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+) -> pd.Series:
+    validate_columns(data, required=[open_col, high_col, low_col, close_col])
+
+    o = pd.to_numeric(data[open_col], errors="coerce").astype(float)
+    h = pd.to_numeric(data[high_col], errors="coerce").astype(float)
+    l = pd.to_numeric(data[low_col], errors="coerce").astype(float)
+    c = pd.to_numeric(data[close_col], errors="coerce").astype(float)
+
+    rng = h - l
+    out = (c - o).abs() / rng.where(rng != 0)
+    out = out.where(rng != 0, 0.0)
+    out = out.clip(lower=0.0, upper=1.0)
+    out.name = "body_to_range_ratio"
+    return out
+
+
+def upper_shadow_ratio(
+    data: pd.DataFrame,
+    *,
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+) -> pd.Series:
+    validate_columns(data, required=[open_col, high_col, low_col, close_col])
+
+    o = pd.to_numeric(data[open_col], errors="coerce").astype(float)
+    h = pd.to_numeric(data[high_col], errors="coerce").astype(float)
+    l = pd.to_numeric(data[low_col], errors="coerce").astype(float)
+    c = pd.to_numeric(data[close_col], errors="coerce").astype(float)
+
+    rng = h - l
+    top_body = np.maximum(o, c)
+    out = (h - top_body) / rng.where(rng != 0)
+    out = out.where(rng != 0, 0.0)
+    out = out.clip(lower=0.0, upper=1.0)
+    out.name = "upper_shadow_ratio"
+    return out
+
+
+def lower_shadow_ratio(
+    data: pd.DataFrame,
+    *,
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+) -> pd.Series:
+    validate_columns(data, required=[open_col, high_col, low_col, close_col])
+
+    o = pd.to_numeric(data[open_col], errors="coerce").astype(float)
+    h = pd.to_numeric(data[high_col], errors="coerce").astype(float)
+    l = pd.to_numeric(data[low_col], errors="coerce").astype(float)
+    c = pd.to_numeric(data[close_col], errors="coerce").astype(float)
+
+    rng = h - l
+    bot_body = np.minimum(o, c)
+    out = (bot_body - l) / rng.where(rng != 0)
+    out = out.where(rng != 0, 0.0)
+    out = out.clip(lower=0.0, upper=1.0)
+    out.name = "lower_shadow_ratio"
     return out

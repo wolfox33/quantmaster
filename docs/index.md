@@ -12,4 +12,7 @@ Padronizar e centralizar features quantitativas (OHLCV -> features) para uso em 
 ```python
 df["rsi_10"] = rsi(df, window=10)
 df = df.join(har_rv(df))
+
+# ou gerar várias features de uma vez (com defaults)
+df = create_all(df)
 ```

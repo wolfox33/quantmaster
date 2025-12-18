@@ -19,6 +19,14 @@ from quantmaster.features import rsi, yang_zhang_volatility, hurst_dfa
 
 Em notebooks, `from quantmaster.features import *` pode ser conveniente, mas não é recomendado para código de produção.
 
+Para gerar várias features de uma vez (com parâmetros default), você pode usar `create_all`:
+
+```python
+from quantmaster.features import create_all
+
+df = create_all(df)
+```
+
 Cada página de feature contém:
 
 - Explicação teórica

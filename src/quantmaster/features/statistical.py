@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from quantmaster.features.utils import get_price_series, validate_positive_int
+from quantmaster.features.utils import get_price_series, validate_columns, validate_positive_int
 
 
 def _fracdiff_weights(d: float, *, thresh: float, max_lags: int) -> np.ndarray:
@@ -474,6 +474,368 @@ def realized_kurtosis(
     denom = m2.pow(2)
     out = float(window) * m4 / denom.where(denom > 0)
     out.name = f"realized_kurtosis_{window}"
+    return out
+
+
+def _rolling_corr_1d(x: np.ndarray, y: np.ndarray) -> float:
+    mask = np.isfinite(x) & np.isfinite(y)
+    if mask.sum() < 2:
+        return float("nan")
+    x_m = x[mask]
+    y_m = y[mask]
+    x_c = x_m - float(x_m.mean())
+    y_c = y_m - float(y_m.mean())
+    denom = float(np.sqrt(np.sum(x_c * x_c) * np.sum(y_c * y_c)))
+    if denom == 0.0:
+        return float("nan")
+    return float(np.sum(x_c * y_c) / denom)
+
+
+def return_autocorrelation(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 60,
+    lag: int = 1,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+    lag = validate_positive_int(lag, name="lag")
+    if lag >= window:
+        raise ValueError(f"lag must be < window, got lag={lag} window={window}")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+
+    if log_returns:
+        r = np.log(price).diff()
+    else:
+        r = price.pct_change()
+
+    def _fn(w: np.ndarray) -> float:
+        a = w[lag:]
+        b = w[:-lag]
+        return _rolling_corr_1d(a, b)
+
+    out = r.rolling(window).apply(_fn, raw=True)
+    out.name = f"return_autocorrelation_{window}_{lag}"
+    return out
+
+
+def absolute_return_autocorrelation(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 60,
+    lag: int = 1,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+    lag = validate_positive_int(lag, name="lag")
+    if lag >= window:
+        raise ValueError(f"lag must be < window, got lag={lag} window={window}")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+
+    if log_returns:
+        r = np.log(price).diff().abs()
+    else:
+        r = price.pct_change().abs()
+
+    def _fn(w: np.ndarray) -> float:
+        a = w[lag:]
+        b = w[:-lag]
+        return _rolling_corr_1d(a, b)
+
+    out = r.rolling(window).apply(_fn, raw=True)
+    out.name = f"absolute_return_autocorrelation_{window}_{lag}"
+    return out
+
+
+def _generalized_hurst_exponent_1d(x: np.ndarray, *, q: float, max_lag: int) -> float:
+    x = x[np.isfinite(x)]
+    if x.size < max_lag + 2:
+        return float("nan")
+
+    taus = np.arange(1, max_lag + 1, dtype=int)
+    moments = np.empty_like(taus, dtype=float)
+    for i, tau in enumerate(taus):
+        d = np.abs(x[tau:] - x[:-tau])
+        if d.size < 2:
+            moments[i] = np.nan
+        else:
+            moments[i] = float(np.mean(d**q))
+
+    mask = np.isfinite(moments) & (moments > 0)
+    if mask.sum() < 2:
+        return float("nan")
+
+    log_tau = np.log(taus[mask].astype(float))
+    log_m = np.log(moments[mask])
+    slope = float(np.polyfit(log_tau, log_m, 1)[0])
+    return float(slope / q)
+
+
+def generalized_hurst_exponent(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 100,
+    q: float = 2.0,
+    max_lag: int = 20,
+    price_col: str = "close",
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+    max_lag = validate_positive_int(max_lag, name="max_lag")
+    try:
+        q = float(q)
+    except (TypeError, ValueError) as exc:
+        raise TypeError(f"q must be float, got {type(q).__name__}") from exc
+    if q <= 0:
+        raise ValueError(f"q must be > 0, got {q}")
+    if max_lag >= window:
+        raise ValueError(f"max_lag must be < window, got max_lag={max_lag} window={window}")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+    x = np.log(price)
+
+    out = pd.Series(np.nan, index=price.index, dtype=float)
+    out.name = f"generalized_hurst_exponent_{window}_{q:g}_{max_lag}"
+
+    if len(x) < window:
+        return out
+
+    arr = x.to_numpy(dtype=float)
+    windows = np.lib.stride_tricks.sliding_window_view(arr, window_shape=window)
+    vals = np.full(windows.shape[0], np.nan, dtype=float)
+    for i in range(windows.shape[0]):
+        vals[i] = _generalized_hurst_exponent_1d(windows[i], q=q, max_lag=max_lag)
+
+    out.iloc[window - 1 :] = vals
+    return out
+
+
+def _fractal_dimension_mincover_1d(x: np.ndarray, *, max_scale: int) -> float:
+    x = x[np.isfinite(x)]
+    n = x.size
+    if n < 4:
+        return float("nan")
+
+    max_scale_eff = min(int(max_scale), max(2, n // 2))
+    if max_scale_eff < 2:
+        return float("nan")
+
+    scales = np.arange(1, max_scale_eff + 1, dtype=int)
+    a = np.empty_like(scales, dtype=float)
+    for i, k in enumerate(scales):
+        m = n // k
+        if m < 1:
+            a[i] = np.nan
+            continue
+        x_use = x[: m * k]
+        blocks = x_use.reshape(m, k)
+        rng = blocks.max(axis=1) - blocks.min(axis=1)
+        a_k = float(np.sum(rng))
+        a[i] = a_k
+
+    mask = np.isfinite(a) & (a > 0) & (scales > 0)
+    if mask.sum() < 2:
+        return float("nan")
+
+    log_s = np.log(scales[mask].astype(float))
+    log_a = np.log(a[mask])
+    slope = float(np.polyfit(log_s, log_a, 1)[0])
+    return float(2.0 - slope)
+
+
+def fractal_dimension_mincover(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 100,
+    max_scale: int = 10,
+    price_col: str = "close",
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+    max_scale = validate_positive_int(max_scale, name="max_scale")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+    x = np.log(price)
+
+    out = pd.Series(np.nan, index=price.index, dtype=float)
+    out.name = f"fractal_dimension_mincover_{window}_{max_scale}"
+
+    if len(x) < window:
+        return out
+
+    arr = x.to_numpy(dtype=float)
+    windows = np.lib.stride_tricks.sliding_window_view(arr, window_shape=window)
+    vals = np.full(windows.shape[0], np.nan, dtype=float)
+    for i in range(windows.shape[0]):
+        vals[i] = _fractal_dimension_mincover_1d(windows[i], max_scale=max_scale)
+
+    out.iloc[window - 1 :] = vals
+    return out
+
+
+def _ols_slope(x: np.ndarray, y: np.ndarray) -> float:
+    mask = np.isfinite(x) & np.isfinite(y)
+    if mask.sum() < 2:
+        return float("nan")
+    x_m = x[mask]
+    y_m = y[mask]
+    x_c = x_m - float(x_m.mean())
+    y_c = y_m - float(y_m.mean())
+    denom = float(np.sum(x_c * x_c))
+    if denom == 0.0:
+        return float("nan")
+    return float(np.sum(x_c * y_c) / denom)
+
+
+def mean_reversion_half_life(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 60,
+    price_col: str = "close",
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+
+    out = pd.Series(np.nan, index=price.index, dtype=float)
+    out.name = f"mean_reversion_half_life_{window}"
+
+    if len(price) < window:
+        return out
+
+    p = np.log(price).to_numpy(dtype=float)
+    pw = np.lib.stride_tricks.sliding_window_view(p, window_shape=window)
+
+    hl = np.full(pw.shape[0], np.nan, dtype=float)
+    for i in range(pw.shape[0]):
+        w = pw[i]
+        x = w[:-1]
+        y = np.diff(w)
+        lam = _ols_slope(x, y)
+        if not np.isfinite(lam) or lam >= 0.0:
+            continue
+        hl[i] = float(-np.log(2.0) / lam)
+
+    out.iloc[window - 1 :] = hl
+    return out
+
+
+def spread_zscore(
+    data: pd.DataFrame,
+    benchmark: pd.Series,
+    *,
+    window: int = 60,
+    price_col: str = "close",
+    log_prices: bool = True,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    asset_price = get_price_series(data, price_col=price_col).astype(float)
+    bench_price = pd.to_numeric(benchmark, errors="coerce").astype(float)
+
+    asset_price = asset_price.where(asset_price > 0)
+    bench_price = bench_price.where(bench_price > 0)
+
+    df = pd.concat([asset_price.rename("asset"), bench_price.rename("bench")], axis=1)
+
+    out = pd.Series(np.nan, index=df.index, dtype=float)
+    out.name = f"spread_zscore_{window}"
+
+    if len(df) < window:
+        return out
+
+    if log_prices:
+        x = np.log(df["asset"]).to_numpy(dtype=float)
+        y = np.log(df["bench"]).to_numpy(dtype=float)
+    else:
+        x = df["asset"].to_numpy(dtype=float)
+        y = df["bench"].to_numpy(dtype=float)
+
+    xw = np.lib.stride_tricks.sliding_window_view(x, window_shape=window)
+    yw = np.lib.stride_tricks.sliding_window_view(y, window_shape=window)
+
+    beta = np.full(xw.shape[0], np.nan, dtype=float)
+    for i in range(xw.shape[0]):
+        beta[i] = _beta_from_windows(xw[i], yw[i])
+
+    spread = x - np.concatenate([np.full(window - 1, np.nan, dtype=float), beta]) * y
+
+    spread_s = pd.Series(spread, index=df.index)
+    mu = spread_s.rolling(window).mean()
+    sigma = spread_s.rolling(window).std(ddof=1)
+    out = (spread_s - mu) / sigma.where(sigma > 0)
+    out.name = f"spread_zscore_{window}"
+    return out
+
+
+def path_signature_features(
+    data: pd.DataFrame,
+    *,
+    depth: int = 2,
+    window: int = 20,
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    volume_col: str = "volume",
+    log_transform: bool = True,
+) -> pd.DataFrame:
+    try:
+        import iisignature  # type: ignore
+    except ImportError as exc:
+        raise ImportError(
+            "path_signature_features requires optional dependency 'iisignature'. "
+            "Install it with `pip install iisignature`."
+        ) from exc
+
+    depth = validate_positive_int(depth, name="depth")
+    window = validate_positive_int(window, name="window")
+
+    cols = [open_col, high_col, low_col, close_col, volume_col]
+    validate_columns(data, required=cols)
+
+    x = data[cols].apply(pd.to_numeric, errors="coerce").astype(float)
+    if log_transform:
+        x = x.where(x > 0)
+        x = np.log(x)
+
+    x_arr = x.to_numpy(dtype=float)
+    n, d = x_arr.shape
+
+    sig_len = int(iisignature.siglength(d, depth))
+    col_names = [f"path_sig_{depth}_{k}" for k in range(sig_len)]
+
+    out = pd.DataFrame(np.nan, index=data.index, columns=col_names, dtype=float)
+    if n < window:
+        return out
+
+    windows = np.lib.stride_tricks.sliding_window_view(x_arr, window_shape=window, axis=0)
+
+    sig_mat = np.full((windows.shape[0], sig_len), np.nan, dtype=float)
+    for i in range(windows.shape[0]):
+        w = windows[i]
+        if not np.isfinite(w).all():
+            continue
+
+        w0 = w - w[0:1]
+        try:
+            sig = np.asarray(iisignature.sig(w0, depth), dtype=float)
+        except Exception:
+            continue
+
+        if sig.shape[0] != sig_len:
+            continue
+        sig_mat[i] = sig
+
+    start = window - 1
+    out.iloc[start:, :] = sig_mat
     return out
 
 

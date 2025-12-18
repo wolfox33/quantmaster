@@ -161,12 +161,12 @@ Regra de “done” para **cada feature** (seguir `new_feature.md`):
 
 **Módulo alvo:** `src/quantmaster/features/volume.py`
 
-- [ ] `price_volume_correlation`
-- [ ] `volume_volatility_ratio`
-- [ ] `close_location_value`
-- [ ] `tick_imbalance_proxy`
-- [ ] `volume_weighted_close_location`
-- [ ] `order_flow_imbalance`
+- [x] `price_volume_correlation`
+- [x] `volume_volatility_ratio`
+- [x] `close_location_value`
+- [x] `tick_imbalance_proxy`
+- [x] `volume_weighted_close_location`
+- [x] `order_flow_imbalance`
 
 ---
 
@@ -174,11 +174,11 @@ Regra de “done” para **cada feature** (seguir `new_feature.md`):
 
 **Módulo alvo:** `src/quantmaster/features/statistical.py`
 
-- [ ] `return_autocorrelation`
-- [ ] `absolute_return_autocorrelation`
-- [ ] `generalized_hurst_exponent`
-- [ ] `fractal_dimension_mincover`
-- [ ] `mean_reversion_half_life`
+- [x] `return_autocorrelation`
+- [x] `absolute_return_autocorrelation`
+- [x] `generalized_hurst_exponent`
+- [x] `fractal_dimension_mincover`
+- [x] `mean_reversion_half_life`
 
 ---
 
@@ -186,7 +186,7 @@ Regra de “done” para **cada feature** (seguir `new_feature.md`):
 
 **Módulo alvo:** `src/quantmaster/features/statistical.py` (ou criar `relative_value.py`)
 
-- [ ] `spread_zscore`
+- [x] `spread_zscore`
 
 ---
 
@@ -194,7 +194,7 @@ Regra de “done” para **cada feature** (seguir `new_feature.md`):
 
 **Módulo alvo:** `src/quantmaster/features/statistical.py` (ou criar `signatures.py`)
 
-- [ ] `path_signature_features` (definir dependência opcional + fallback/erro claro se ausente)
+- [x] `path_signature_features` (definir dependência opcional + fallback/erro claro se ausente)
 
 ---
 
@@ -202,10 +202,10 @@ Regra de “done” para **cada feature** (seguir `new_feature.md`):
 
 **Módulo alvo:** `src/quantmaster/features/trend.py` (ou criar `price_action.py`)
 
-- [ ] `bar_range_position`
-- [ ] `body_to_range_ratio`
-- [ ] `upper_shadow_ratio`
-- [ ] `lower_shadow_ratio`
+- [x] `bar_range_position`
+- [x] `body_to_range_ratio`
+- [x] `upper_shadow_ratio`
+- [x] `lower_shadow_ratio`
 
 ---
 
