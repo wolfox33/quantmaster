@@ -8,7 +8,7 @@ import pandas as pd
 
 DEFAULT_OHLCV_COLUMNS: tuple[str, ...] = ("open", "high", "low", "close", "volume")
 
-DEFAULT_CREATE_ALL_EXCLUDE: set[str] = {"create_all", "har_rv_forecast"}
+DEFAULT_CREATE_ALL_EXCLUDE: set[str] = {"create_all", "har_rv_forecast", "mean_reversion_half_life"}
 
 
 def validate_positive_int(value: int, *, name: str) -> int:
@@ -110,6 +110,8 @@ def create_all(
             continue
 
         if isinstance(res, pd.Series):
+            if res.isna().all():
+                continue
             col = res.name or name
             if (not overwrite) and (col in out_df.columns):
                 continue
@@ -117,6 +119,8 @@ def create_all(
             continue
 
         if isinstance(res, pd.DataFrame):
+            if res.isna().all(axis=None):
+                continue
             for c in res.columns:
                 if (not overwrite) and (c in out_df.columns):
                     continue

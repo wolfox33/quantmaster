@@ -352,8 +352,8 @@ def realized_semivariance(
         rets = price.pct_change()
 
     sq = rets.pow(2)
-    pos = sq.where(rets > 0)
-    neg = sq.where(rets < 0)
+    pos = sq.where(rets > 0, 0.0)
+    neg = sq.where(rets < 0, 0.0)
 
     out = pd.DataFrame(index=price.index)
     out["rsv_pos"] = pos

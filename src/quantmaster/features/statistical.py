@@ -26,7 +26,7 @@ def _fracdiff_weights(d: float, *, thresh: float, max_lags: int) -> np.ndarray:
 def fracdiff(
     data: pd.DataFrame | pd.Series,
     *,
-    d: float = 0.5,
+    d: float = 0.4,
     thresh: float = 1e-5,
     max_lags: int | None = None,
     price_col: str = "close",
@@ -61,19 +61,52 @@ def fracdiff(
             out.name = out_name
         return out
 
-    max_allowed_lags = len(x) - 1
-    max_lags_eff = max_allowed_lags if max_lags is None else min(max_lags, max_allowed_lags)
+    x_arr = x.to_numpy(dtype=float)
+    finite = np.isfinite(x_arr)
 
-    weights = _fracdiff_weights(d, thresh=thresh, max_lags=max_lags_eff)
-    k = len(weights) - 1
+    y = np.full(x_arr.shape[0], np.nan, dtype=float)
 
-    y = np.convolve(x.to_numpy(dtype=float), weights, mode="full")[: len(x)]
-    if k > 0:
-        y[:k] = np.nan
+    if finite.any():
+        idxs = np.flatnonzero(finite)
+        start = int(idxs[0])
+        prev = int(idxs[0])
+        for i in idxs[1:]:
+            i = int(i)
+            if i != prev + 1:
+                _apply_fracdiff_segment(y, x_arr, start=start, end=prev + 1, d=d, thresh=thresh, max_lags=max_lags)
+                start = i
+            prev = i
+        _apply_fracdiff_segment(y, x_arr, start=start, end=prev + 1, d=d, thresh=thresh, max_lags=max_lags)
 
     out = pd.Series(y, index=x.index)
     out.name = out_name
     return out
+
+
+def _apply_fracdiff_segment(
+    y: np.ndarray,
+    x: np.ndarray,
+    *,
+    start: int,
+    end: int,
+    d: float,
+    thresh: float,
+    max_lags: int | None,
+) -> None:
+    seg = x[start:end]
+    if seg.size < 2:
+        return
+
+    max_allowed_lags = int(seg.size - 1)
+    max_lags_eff = max_allowed_lags if max_lags is None else min(int(max_lags), max_allowed_lags)
+
+    weights = _fracdiff_weights(d, thresh=thresh, max_lags=max_lags_eff)
+    k = len(weights) - 1
+
+    seg_y = np.convolve(seg, weights, mode="full")[: seg.size]
+    if k > 0:
+        seg_y[:k] = np.nan
+    y[start:end] = seg_y
 
 
 def hurst_dfa(

@@ -31,11 +31,11 @@ def test_fracdiff_shape_and_name() -> None:
     idx = pd.date_range("2024-01-01", periods=60, freq="D")
     df = pd.DataFrame({"close": range(1, 61)}, index=idx)
 
-    out = fracdiff(df, d=0.5)
+    out = fracdiff(df)
 
     assert isinstance(out, pd.Series)
     assert out.index.equals(df.index)
-    assert out.name == "fracdiff_0.5"
+    assert out.name == "fracdiff_0.4"
 
     valid = out.dropna()
     assert np.isfinite(valid).all()
@@ -66,10 +66,24 @@ def test_fracdiff_max_lags_controls_warmup_nans() -> None:
     idx = pd.date_range("2024-01-01", periods=20, freq="D")
     df = pd.DataFrame({"close": range(1, 21)}, index=idx)
 
-    out = fracdiff(df, d=0.5, max_lags=3, thresh=1e-12)
+    out = fracdiff(df, d=0.4, max_lags=3, thresh=1e-12)
 
     assert out.iloc[:3].isna().all()
     assert out.iloc[3:].notna().any()
+
+
+def test_fracdiff_handles_internal_nans_by_segment() -> None:
+    idx = pd.date_range("2024-01-01", periods=50, freq="D")
+    close = pd.Series(np.arange(1, 51, dtype=float), index=idx)
+    close.iloc[10:15] = np.nan
+    df = pd.DataFrame({"close": close}, index=idx)
+
+    out = fracdiff(df, d=0.4, max_lags=3, thresh=1e-12)
+
+    # Gap stays NaN
+    assert out.iloc[10:15].isna().all()
+    # After the gap, the segment should recover (not remain all-NaN)
+    assert out.iloc[18:].notna().any()
 
 
 def test_hurst_dfa_shape_and_index() -> None:
