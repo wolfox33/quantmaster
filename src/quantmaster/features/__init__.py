@@ -5,7 +5,11 @@ from quantmaster.features.microstructure import (
     corwin_schultz_spread,
     relative_spread_proxy,
     roll_spread,
+    order_flow_imbalance_range,
+    vpin_proxy,
+    vwap_deviation,
 )
+from quantmaster.features.entropy import permutation_entropy, shannon_entropy
 from quantmaster.features.momentum import chande_momentum_oscillator, rsi, time_series_momentum
 from quantmaster.features.regime import (
     cusum_statistic,
@@ -22,8 +26,6 @@ from quantmaster.features.risk import (
 from quantmaster.features.returns import intraday_return, overnight_gap
 from quantmaster.features.statistical import (
     absolute_return_autocorrelation,
-    approximate_entropy,
-    cross_sample_entropy,
     fractal_dimension_mincover,
     downside_beta,
     fracdiff,
@@ -32,14 +34,14 @@ from quantmaster.features.statistical import (
     information_discreteness,
     mean_reversion_half_life,
     ornstein_uhlenbeck,
-    permutation_entropy,
     realized_kurtosis,
     realized_skewness,
     return_autocorrelation,
     rolling_beta,
     path_signature_features,
     spread_zscore,
-    sample_entropy,
+    volatility_clustering,
+    ljung_box_stat,
 )
 from quantmaster.features.trend import (
     bar_range_position,
@@ -88,10 +90,8 @@ from quantmaster.features.utils import create_all
 __all__ = [
     "amihud_illiquidity",
     "absolute_return_autocorrelation",
-    "approximate_entropy",
     "bipower_variation",
     "corwin_schultz_spread",
-    "cross_sample_entropy",
     "cusum_statistic",
     "downside_beta",
     "expected_shortfall",
@@ -139,7 +139,6 @@ __all__ = [
     "signed_jump_variation",
     "tail_risk_measure",
     "time_series_momentum",
-    "sample_entropy",
     "trend_intensity",
     "trend_strength_autocorr",
     "trend_strength_indicator",
@@ -155,4 +154,10 @@ __all__ = [
     "volume_volatility_ratio",
     "volume_weighted_close_location",
     "yang_zhang_volatility",
+    "shannon_entropy",
+    "volatility_clustering",
+    "ljung_box_stat",
+    "order_flow_imbalance_range",
+    "vpin_proxy",
+    "vwap_deviation",
 ]

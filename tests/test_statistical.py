@@ -6,8 +6,6 @@ from tests.helpers import assert_no_lookahead
 
 from quantmaster.features.statistical import (
     absolute_return_autocorrelation,
-    approximate_entropy,
-    cross_sample_entropy,
     fractal_dimension_mincover,
     fracdiff,
     generalized_hurst_exponent,
@@ -17,13 +15,13 @@ from quantmaster.features.statistical import (
     mean_reversion_half_life,
     ornstein_uhlenbeck,
     path_signature_features,
-    permutation_entropy,
     realized_kurtosis,
     realized_skewness,
     return_autocorrelation,
     rolling_beta,
     spread_zscore,
-    sample_entropy,
+    volatility_clustering,
+    ljung_box_stat,
 )
 
 
@@ -118,89 +116,15 @@ def test_ornstein_uhlenbeck_shape_and_columns() -> None:
     assert out.notna().any().any()
 
 
-def test_sample_entropy_shape_name_and_no_lookahead() -> None:
-    idx = pd.date_range("2024-01-01", periods=120, freq="D")
-    df = pd.DataFrame({"close": np.linspace(1.0, 2.0, len(idx))}, index=idx)
-
-    out = sample_entropy(df, window=30, m=2, r=0.2)
-
-    assert isinstance(out, pd.Series)
-    assert out.index.equals(df.index)
-    assert out.name == "sample_entropy_30"
-    assert out.notna().any()
-
-    assert_no_lookahead(
-        feature_fn=sample_entropy,
-        data=df,
-        t=60,
-        feature_kwargs={"window": 30, "m": 2, "r": 0.2},
-    )
 
 
-def test_approximate_entropy_shape_name_and_no_lookahead() -> None:
-    idx = pd.date_range("2024-01-01", periods=120, freq="D")
-    df = pd.DataFrame({"close": np.linspace(1.0, 2.0, len(idx))}, index=idx)
-
-    out = approximate_entropy(df, window=30, m=2, r=0.2)
-
-    assert isinstance(out, pd.Series)
-    assert out.index.equals(df.index)
-    assert out.name == "approximate_entropy_30"
-    assert out.notna().any()
-
-    assert_no_lookahead(
-        feature_fn=approximate_entropy,
-        data=df,
-        t=60,
-        feature_kwargs={"window": 30, "m": 2, "r": 0.2},
-    )
 
 
-def test_permutation_entropy_shape_name_and_no_lookahead() -> None:
-    idx = pd.date_range("2024-01-01", periods=120, freq="D")
-    df = pd.DataFrame({"close": np.linspace(1.0, 2.0, len(idx))}, index=idx)
-
-    out = permutation_entropy(df, window=40, order=3, delay=1)
-
-    assert isinstance(out, pd.Series)
-    assert out.index.equals(df.index)
-    assert out.name == "permutation_entropy_40_3_1"
-    assert out.notna().any()
-
-    assert_no_lookahead(
-        feature_fn=permutation_entropy,
-        data=df,
-        t=60,
-        feature_kwargs={"window": 40, "order": 3, "delay": 1},
-    )
 
 
-def test_cross_sample_entropy_shape_name_and_no_lookahead() -> None:
-    idx = pd.date_range("2024-01-01", periods=120, freq="D")
-    df = pd.DataFrame(
-        {
-            "x": np.linspace(1.0, 2.0, len(idx)),
-            "y": np.linspace(1.1, 2.1, len(idx)),
-        },
-        index=idx,
-    )
 
-    def _fn(d: pd.DataFrame, *, window: int, m: int, r: float) -> pd.Series:
-        return cross_sample_entropy(d["x"], d["y"], window=window, m=m, r=r)
 
-    out = _fn(df, window=30, m=2, r=0.2)
 
-    assert isinstance(out, pd.Series)
-    assert out.index.equals(df.index)
-    assert out.name == "cross_sample_entropy_30"
-    assert out.notna().any()
-
-    assert_no_lookahead(
-        feature_fn=_fn,
-        data=df,
-        t=60,
-        feature_kwargs={"window": 30, "m": 2, "r": 0.2},
-    )
 
 
 def test_rolling_beta_shape_name_and_no_lookahead() -> None:
@@ -470,3 +394,30 @@ def test_spread_zscore_shape_name_and_no_lookahead() -> None:
     assert np.isfinite(valid).all()
 
     assert_no_lookahead(feature_fn=_fn, data=df, t=120, feature_kwargs={"window": 60})
+
+
+
+
+def test_volatility_clustering_shape_name() -> None:
+    idx = pd.date_range("2024-01-01", periods=100, freq="D")
+    df = pd.DataFrame({"close": np.linspace(100, 200, 100)}, index=idx)
+    
+    out = volatility_clustering(df, window=50)
+    
+    assert out.name == "volatility_clustering_50_1"
+    
+    # Random test
+    np.random.seed(42)
+    rets = np.random.normal(0, 0.01, 100)
+    df_rand = pd.DataFrame({"close": 100 * np.exp(np.cumsum(rets))}, index=idx)
+    out_rand = volatility_clustering(df_rand, window=50)
+    assert isinstance(out_rand, pd.Series)
+
+
+def test_ljung_box_stat_shape_name() -> None:
+    idx = pd.date_range("2024-01-01", periods=100, freq="D")
+    df = pd.DataFrame({"close": np.linspace(100, 200, 100)}, index=idx)
+    
+    out = ljung_box_stat(df, window=50, lags=5)
+    assert out.name == "ljung_box_stat_50_5"
+    assert isinstance(out, pd.Series)

@@ -906,56 +906,10 @@ def _count_matches_upper(emb: np.ndarray, tol: float) -> int:
     return cnt
 
 
-def _sample_entropy_1d(x: np.ndarray, *, m: int, tol: float) -> float:
-    n = x.size
-    if n < m + 2:
-        return float("nan")
-
-    if not np.isfinite(x).all():
-        return float("nan")
-
-    emb_m = np.lib.stride_tricks.sliding_window_view(x, window_shape=m)
-    emb_m1 = np.lib.stride_tricks.sliding_window_view(x, window_shape=m + 1)
-
-    b = _count_matches_upper(emb_m, tol)
-    a = _count_matches_upper(emb_m1, tol)
-
-    if b <= 0 or a <= 0:
-        return float("nan")
-
-    return float(-np.log(a / b))
 
 
-def _approximate_entropy_1d(x: np.ndarray, *, m: int, tol: float) -> float:
-    n = x.size
-    if n < m + 2:
-        return float("nan")
 
-    if not np.isfinite(x).all():
-        return float("nan")
 
-    emb_m = np.lib.stride_tricks.sliding_window_view(x, window_shape=m)
-    emb_m1 = np.lib.stride_tricks.sliding_window_view(x, window_shape=m + 1)
-
-    k_m = emb_m.shape[0]
-    k_m1 = emb_m1.shape[0]
-
-    c_m = np.empty(k_m, dtype=float)
-    for i in range(k_m):
-        dist = np.max(np.abs(emb_m - emb_m[i]), axis=1)
-        c_m[i] = np.sum(dist <= tol) / float(k_m)
-
-    c_m1 = np.empty(k_m1, dtype=float)
-    for i in range(k_m1):
-        dist = np.max(np.abs(emb_m1 - emb_m1[i]), axis=1)
-        c_m1[i] = np.sum(dist <= tol) / float(k_m1)
-
-    if not (c_m > 0).all() or not (c_m1 > 0).all():
-        return float("nan")
-
-    phi_m = float(np.mean(np.log(c_m)))
-    phi_m1 = float(np.mean(np.log(c_m1)))
-    return phi_m - phi_m1
 
 
 def _permutation_entropy_1d(x: np.ndarray, *, order: int, delay: int) -> float:
@@ -980,94 +934,13 @@ def _permutation_entropy_1d(x: np.ndarray, *, order: int, delay: int) -> float:
     return float(-np.sum(p * np.log(p)))
 
 
-def _cross_sample_entropy_1d(x1: np.ndarray, x2: np.ndarray, *, m: int, tol: float) -> float:
-    if x1.size != x2.size:
-        return float("nan")
-    n = x1.size
-    if n < m + 2:
-        return float("nan")
-    if not np.isfinite(x1).all() or not np.isfinite(x2).all():
-        return float("nan")
-
-    emb1_m = np.lib.stride_tricks.sliding_window_view(x1, window_shape=m)
-    emb2_m = np.lib.stride_tricks.sliding_window_view(x2, window_shape=m)
-    emb1_m1 = np.lib.stride_tricks.sliding_window_view(x1, window_shape=m + 1)
-    emb2_m1 = np.lib.stride_tricks.sliding_window_view(x2, window_shape=m + 1)
-
-    b = 0
-    for i in range(emb1_m.shape[0]):
-        dist = np.max(np.abs(emb2_m - emb1_m[i]), axis=1)
-        b += int(np.sum(dist <= tol))
-
-    a = 0
-    for i in range(emb1_m1.shape[0]):
-        dist = np.max(np.abs(emb2_m1 - emb1_m1[i]), axis=1)
-        a += int(np.sum(dist <= tol))
-
-    if b <= 0 or a <= 0:
-        return float("nan")
-
-    return float(-np.log(a / b))
 
 
-def sample_entropy(
-    data: pd.DataFrame | pd.Series,
-    *,
-    window: int = 100,
-    m: int = 2,
-    r: float = 0.2,
-    price_col: str = "close",
-) -> pd.Series:
-    window = _validate_positive_int_local(window, name="window")
-    m = _validate_m(m)
-    r = _validate_r(r)
-
-    x = get_price_series(data, price_col=price_col).astype(float)
-    out = pd.Series(np.nan, index=x.index, dtype=float)
-    out.name = f"sample_entropy_{window}"
-
-    if len(x) < window:
-        return out
-
-    x_arr = x.to_numpy(dtype=float)
-    for i in range(window - 1, len(x_arr)):
-        win = x_arr[i - window + 1 : i + 1]
-        if not np.isfinite(win).all():
-            continue
-        tol = r * float(np.std(win))
-        out.iat[i] = _sample_entropy_1d(win, m=m, tol=tol)
-
-    return out
 
 
-def approximate_entropy(
-    data: pd.DataFrame | pd.Series,
-    *,
-    window: int = 100,
-    m: int = 2,
-    r: float = 0.2,
-    price_col: str = "close",
-) -> pd.Series:
-    window = _validate_positive_int_local(window, name="window")
-    m = _validate_m(m)
-    r = _validate_r(r)
 
-    x = get_price_series(data, price_col=price_col).astype(float)
-    out = pd.Series(np.nan, index=x.index, dtype=float)
-    out.name = f"approximate_entropy_{window}"
 
-    if len(x) < window:
-        return out
 
-    x_arr = x.to_numpy(dtype=float)
-    for i in range(window - 1, len(x_arr)):
-        win = x_arr[i - window + 1 : i + 1]
-        if not np.isfinite(win).all():
-            continue
-        tol = r * float(np.std(win))
-        out.iat[i] = _approximate_entropy_1d(win, m=m, tol=tol)
-
-    return out
 
 
 def permutation_entropy(
@@ -1101,41 +974,107 @@ def permutation_entropy(
     return out
 
 
-def cross_sample_entropy(
-    data1: pd.Series,
-    data2: pd.Series,
+
+
+
+
+
+def volatility_clustering(
+    data: pd.DataFrame | pd.Series,
     *,
-    window: int = 100,
-    m: int = 2,
-    r: float = 0.2,
+    window: int = 60,
+    lag: int = 1,
+    price_col: str = "close",
+    log_returns: bool = True,
 ) -> pd.Series:
-    window = _validate_positive_int_local(window, name="window")
-    m = _validate_m(m)
-    r = _validate_r(r)
+    """
+    Autocorrelation of squared returns (ARCH effect).
+    
+    High values indicate persistence of volatility (volatility clustering).
+    """
+    window = validate_positive_int(window, name="window")
+    lag = validate_positive_int(lag, name="lag")
+    
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+    
+    if log_returns:
+        r = np.log(price).diff()
+    else:
+        r = price.pct_change()
+        
+    r2 = r.pow(2)
+    
+    # Autocorrelation of squared returns using _rolling_corr_1d logic or pandas
+    
+    def _fn(w: np.ndarray) -> float:
+        a = w[lag:]
+        b = w[:-lag]
+        return _rolling_corr_1d(a, b)
 
-    s1 = pd.to_numeric(data1, errors="coerce").astype(float)
-    s2 = pd.to_numeric(data2, errors="coerce").astype(float)
+    out = r2.rolling(window).apply(_fn, raw=True)
+    out.name = f"volatility_clustering_{window}_{lag}"
+    return out
 
-    df = pd.concat([s1.rename("x"), s2.rename("y")], axis=1)
 
-    out = pd.Series(np.nan, index=df.index, dtype=float)
-    out.name = f"cross_sample_entropy_{window}"
+def ljung_box_stat(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 60,
+    lags: int = 10,
+    price_col: str = "close",
+    log_returns: bool = True,
+) -> pd.Series:
+    """
+    Rolling Ljung-Box Q Statistic.
+    
+    Tests for absence of serial correlation up to `lags`.
+    High Q => Significant autocorrelation (predictability).
+    """
+    window = validate_positive_int(window, name="window")
+    lags = validate_positive_int(lags, name="lags")
+    
+    if lags >= window:
+        raise ValueError(f"lags must be < window, got lags={lags} window={window}")
 
-    if len(df) < window:
-        return out
+    price = get_price_series(data, price_col=price_col).astype(float)
+    price = price.where(price > 0)
+    
+    if log_returns:
+        r = np.log(price).diff()
+    else:
+        r = price.pct_change()
 
-    x1 = df["x"].to_numpy(dtype=float)
-    x2 = df["y"].to_numpy(dtype=float)
+    # We need rolling Q stat.
+    # Q = n(n+2) * sum(rho_k^2 / (n-k)) for k=1 to lags
+    # Here n = window.
+    
+    def _calc_q(w: np.ndarray) -> float:
+        w = w[np.isfinite(w)]
+        n = len(w)
+        if n < lags + 2:
+            return np.nan
+            
+        # Center w
+        mean = np.mean(w)
+        w_c = w - mean
+        var = np.sum(w_c**2)
+        if var == 0:
+            return 0.0
+            
+        q_sum = 0.0
+        for k in range(1, lags + 1):
+            # Autocorr at lag k
+            w_head = w_c[k:]
+            w_tail = w_c[:-k]
+            
+            cov = np.sum(w_head * w_tail)
+            rho = cov / var
+            
+            q_sum += (rho**2) / (n - k)
+            
+        return float(n * (n + 2) * q_sum)
 
-    for i in range(window - 1, len(df)):
-        w1 = x1[i - window + 1 : i + 1]
-        w2 = x2[i - window + 1 : i + 1]
-        if not np.isfinite(w1).all() or not np.isfinite(w2).all():
-            continue
-        std = float(np.std(np.concatenate([w1, w2])))
-        if not np.isfinite(std):
-            continue
-        tol = r * std
-        out.iat[i] = _cross_sample_entropy_1d(w1, w2, m=m, tol=tol)
-
+    out = r.rolling(window).apply(_calc_q, raw=True)
+    out.name = f"ljung_box_stat_{window}_{lags}"
     return out

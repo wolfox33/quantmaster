@@ -264,26 +264,7 @@ def signed_jump_variation(
 
 ### 3.4 Entropy & Complexity
 
-#### 3.4.1 `sample_entropy`
-**Referência:** Richman & Moorman (2000)
 
-Mede regularidade/previsibilidade de uma série temporal.
-
-```python
-def sample_entropy(
-    data: pd.DataFrame | pd.Series,
-    *,
-    window: int = 100,
-    m: int = 2,
-    r: float = 0.2,
-    price_col: str = "close",
-) -> pd.Series:
-    # SampEn = -ln(A/B) onde A e B são contagens de padrões similares
-```
-
-**Por que incluir:** Detecta mudanças de regime; baixa entropia indica mercado previsível; usado em análise de séries financeiras.
-
----
 
 #### 3.4.2 `permutation_entropy`
 **Referência:** Bandt & Pompe (2002)
@@ -588,7 +569,7 @@ def intraday_return(
 11. `roll_spread` - Clássico mas menos preciso
 12. `rogers_satchell_volatility` - Com drift
 13. `jump_variation` - Requer bipower
-14. `sample_entropy` - Computacionalmente intensivo
+
 15. Outras features de range e autocorrelação
 
 ---
@@ -1404,48 +1385,9 @@ def mean_reversion_strength(
 
 ### 13.2 Entropy & Complexity (MQL5 Implementations)
 
-#### 13.2.1 `cross_sample_entropy`
-**Referência:** MQL5 - "Grokking market memory through differentiation and entropy analysis"
 
-Entropia cruzada entre duas séries temporais.
 
-```python
-def cross_sample_entropy(
-    data1: pd.Series,
-    data2: pd.Series,
-    *,
-    m: int = 2,
-    r: float = 0.2,
-) -> pd.Series:
-    # CrossSampEn mede similaridade de padrões entre séries
-    # Útil para detectar lead-lag relationships
-```
 
-**Por que incluir:** Detecta relações não-lineares entre ativos; base para pairs trading; não existe em libs tradicionais.
-
----
-
-#### 13.2.2 `approximate_entropy`
-**Referência:** Pincus & Kalman (1991), MQL5 implementation
-
-Predecessor do Sample Entropy, mede irregularidade.
-
-```python
-def approximate_entropy(
-    data: pd.DataFrame | pd.Series,
-    *,
-    window: int = 100,
-    m: int = 2,
-    r: float = 0.2,
-    price_col: str = "close",
-) -> pd.Series:
-    # ApEn = ln(C_m(r)) - ln(C_{m+1}(r))
-    # Baixo ApEn = série regular/previsível
-```
-
-**Por que incluir:** Mais sensível que SampEn para séries curtas; detecta mudanças de regime; histórico de uso em finanças.
-
----
 
 ### 13.3 Adaptive Indicators
 
@@ -1700,8 +1642,7 @@ def lower_shadow_ratio(
 8. `bar_range_position` - Candlestick feature
 
 ### Tier 3 (Especializadas)
-9. `approximate_entropy` - Predecessor do SampEn
-10. `cross_sample_entropy` - Pairs trading
+
 11. `nrtr_channel` - Trading system
 12. `body_to_range_ratio`, `upper/lower_shadow_ratio` - Candlestick ML
 
@@ -1841,7 +1782,7 @@ As demais features propostas **não têm risco de lookahead bias** pois:
 3. **Jump Detection** (`bipower_variation`, `jump_variation`, `realized_semivariance`, `signed_jump_variation`):
    - Usam retornos passados adjacentes `r_{t-1}` e `r_t`
 
-4. **Entropy** (`sample_entropy`, `permutation_entropy`, `approximate_entropy`):
+4. **Entropy** (`permutation_entropy`):
    - Calculadas sobre janela de dados passados
 
 5. **Regime** (`variance_ratio`, `trend_intensity`, `runs_test`):
