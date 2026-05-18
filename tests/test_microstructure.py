@@ -6,8 +6,11 @@ import pandas as pd
 from quantmaster.features.microstructure import (
     amihud_illiquidity,
     corwin_schultz_spread,
+    order_flow_imbalance_range,
     relative_spread_proxy,
     roll_spread,
+    vpin_proxy,
+    vwap_deviation,
 )
 from tests.helpers import assert_no_lookahead
 
@@ -93,3 +96,81 @@ def test_relative_spread_proxy_shape_name_and_no_lookahead() -> None:
     assert (valid >= 0).all()
 
     assert_no_lookahead(feature_fn=relative_spread_proxy, data=df, t=40, feature_kwargs={"window": 14})
+
+
+def test_vwap_deviation_shape_name_and_values() -> None:
+    idx = pd.date_range("2024-01-01", periods=100, freq="D")
+    df = pd.DataFrame(
+        {
+            "close": np.full(100, 110.0), # Constant price
+            "volume": np.full(100, 1000.0),
+        },
+        index=idx,
+    )
+    
+    # VWAP should be 110.0. Deviation should be 0.
+    out = vwap_deviation(df, window=20)
+    assert np.allclose(out.dropna(), 0.0)
+    assert out.name == "vwap_deviation_20"
+    
+    # Rising price
+    df["close"] = np.linspace(100, 200, 100)
+    # Price is rising, so Price > VWAP (since VWAP lags). Deviation should be positive.
+    out_rising = vwap_deviation(df, window=20)
+    assert (out_rising.dropna() > 0).all()
+    
+    assert_no_lookahead(feature_fn=vwap_deviation, data=df, t=40, feature_kwargs={"window": 20})
+
+
+def test_order_flow_imbalance_range_shape_name() -> None:
+    idx = pd.date_range("2024-01-01", periods=100, freq="D")
+    df = pd.DataFrame(
+        {
+            "open": np.linspace(100, 200, 100),
+            "close": np.linspace(101, 201, 100), # Always close > open (bullish)
+            "high": np.linspace(102, 202, 100),
+            "low": np.linspace(99, 199, 100),
+            "volume": np.full(100, 1000.0),
+        },
+        index=idx,
+    )
+    # OFI should be positive
+    out = order_flow_imbalance_range(df)
+    assert (out.dropna() > 0).all()
+    
+    # Check name
+    assert out.name == "order_flow_imbalance_range"
+
+
+def test_vpin_proxy_shape_name() -> None:
+    idx = pd.date_range("2024-01-01", periods=100, freq="D")
+    df = pd.DataFrame(
+        {
+            "open": np.full(100, 100.0),
+            "close": np.full(100, 101.0), # Always up
+            "volume": np.full(100, 1000.0),
+        },
+        index=idx,
+    )
+    # Everything is buy volume. V_buy = 1000, V_sell = 0.
+    # |1000 - 0| / (1000 + 0) = 1.0. 
+    # VPIN should be 1.0
+    out = vpin_proxy(df, window=20)
+    assert np.allclose(out.dropna(), 1.0)
+    
+    # Mixed scenario
+    df.iloc[::2, df.columns.get_loc("close")] = 99.0 # Alternating up/down
+    # close < open (100)
+    
+    # V_buy = 1000 (even indices? no odd indices 1, 3 etc remain 101)
+    # Actually wait:
+    # 0: close 99 (sell)
+    # 1: close 101 (buy)
+    # Window 2: |V_buy - V_sell| = |1000 - 1000| = 0.
+    # VPIN ~ 0.
+    
+    out_mixed = vpin_proxy(df, window=2)
+    # Should be close to 0 (skipping first few)
+    assert np.allclose(out_mixed.dropna(), 0.0)
+    
+    assert_no_lookahead(feature_fn=vpin_proxy, data=df, t=40, feature_kwargs={"window": 20})

@@ -151,3 +151,103 @@ def relative_spread_proxy(
 
     out.name = f"relative_spread_proxy_{window}"
     return out
+
+
+def vwap_deviation(
+    data: pd.DataFrame,
+    *,
+    window: int = 20,
+    price_col: str = "close",
+    volume_col: str = "volume",
+) -> pd.Series:
+    """
+    Percentage deviation from rolling VWAP.
+
+    Positive values indicate price > VWAP (bullish pressure/premium).
+    Negative values indicate price < VWAP (bearish pressure/discount).
+    """
+    window = validate_positive_int(window, name="window")
+    validate_columns(data, required=(price_col, volume_col))
+
+    price = get_price_series(data, price_col=price_col).astype(float)
+    volume = pd.to_numeric(data[volume_col], errors="coerce").astype(float)
+
+    pv = price * volume
+    cum_pv = pv.rolling(window).sum()
+    cum_v = volume.rolling(window).sum()
+
+    vwap = cum_pv / cum_v
+    
+    # Deviation %
+    dev = (price - vwap) / vwap
+    
+    out = dev * 100.0
+    out.name = f"vwap_deviation_{window}"
+    return out
+
+
+def order_flow_imbalance_range(
+    data: pd.DataFrame,
+    *,
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    volume_col: str = "volume",
+) -> pd.Series:
+    """
+    Order Flow Imbalance Proxy based on Price Range.
+    
+    OFI = ((Close - Open) * Volume) / (High - Low)
+    
+    Captures the directional pressure relative to the day's range.
+    """
+    validate_columns(data, required=(open_col, high_col, low_col, close_col, volume_col))
+
+    o = pd.to_numeric(data[open_col], errors="coerce").astype(float)
+    h = pd.to_numeric(data[high_col], errors="coerce").astype(float)
+    l = pd.to_numeric(data[low_col], errors="coerce").astype(float)
+    c = pd.to_numeric(data[close_col], errors="coerce").astype(float)
+    v = pd.to_numeric(data[volume_col], errors="coerce").astype(float)
+
+    rng = (h - l).replace(0, np.nan)
+    body = c - o
+    
+    ofi = (body * v) / rng
+    
+    out = ofi
+    out.name = "order_flow_imbalance_range"
+    return out
+
+
+def vpin_proxy(
+    data: pd.DataFrame,
+    *,
+    window: int = 20,
+    open_col: str = "open",
+    close_col: str = "close",
+    volume_col: str = "volume",
+) -> pd.Series:
+    """
+    Proxy for VPIN (Volume-Synchronized Probability of Informed Trading).
+    
+    Uses candle direction to classify volume as buy/sell.
+    VPIN ~ |V_buy - V_sell| / (V_buy + V_sell) (rolling sum)
+    """
+    window = validate_positive_int(window, name="window")
+    validate_columns(data, required=(open_col, close_col, volume_col))
+
+    o = pd.to_numeric(data[open_col], errors="coerce").astype(float)
+    c = pd.to_numeric(data[close_col], errors="coerce").astype(float)
+    v = pd.to_numeric(data[volume_col], errors="coerce").astype(float)
+
+    signed_volume = v * np.sign(c - o)
+    
+    # Absolute imbalance sum
+    num = signed_volume.rolling(window).sum().abs()
+    # Total volume sum
+    den = v.rolling(window).sum()
+    
+    out = num / den.where(den > 0)
+    out.name = f"vpin_proxy_{window}"
+    return out

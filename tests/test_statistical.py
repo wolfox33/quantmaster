@@ -2,16 +2,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tests.helpers import assert_no_lookahead
-
 from quantmaster.features.statistical import (
     absolute_return_autocorrelation,
-    fractal_dimension_mincover,
+    downside_beta,
     fracdiff,
+    fractal_dimension_mincover,
     generalized_hurst_exponent,
     hurst_dfa,
     information_discreteness,
-    downside_beta,
+    ljung_box_stat,
     mean_reversion_half_life,
     ornstein_uhlenbeck,
     path_signature_features,
@@ -21,8 +20,8 @@ from quantmaster.features.statistical import (
     rolling_beta,
     spread_zscore,
     volatility_clustering,
-    ljung_box_stat,
 )
+from tests.helpers import assert_no_lookahead
 
 
 def test_fracdiff_shape_and_name() -> None:

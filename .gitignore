@@ -9,10 +9,12 @@ ENV/
 
 .pytest_cache/
 .ruff_cache/
+site/
 
 build/
 dist/
 *.egg-info/
+tests/feature_performance.log
 
 .ipynb_checkpoints/
 .DS_Store

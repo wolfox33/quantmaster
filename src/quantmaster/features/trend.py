@@ -125,7 +125,6 @@ def bar_range_position(
 ) -> pd.Series:
     validate_columns(data, required=[open_col, high_col, low_col, close_col])
 
-    o = pd.to_numeric(data[open_col], errors="coerce").astype(float)
     h = pd.to_numeric(data[high_col], errors="coerce").astype(float)
     l = pd.to_numeric(data[low_col], errors="coerce").astype(float)
     c = pd.to_numeric(data[close_col], errors="coerce").astype(float)

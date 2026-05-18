@@ -8,6 +8,12 @@ Biblioteca de features quantitativas para adicionar colunas em `pandas.DataFrame
 pip install -e ".[dev]"
 ```
 
+## Instalação (uso)
+
+```bash
+pip install quantmaster
+```
+
 ## Uso rápido
 
 ```python
@@ -40,3 +46,31 @@ from quantmaster.features import *
 
 - Features ficam em `src/quantmaster/features/` separadas por categoria (Momentum, Trend, Volatility, etc.).
 - Cada feature é uma função que recebe `DataFrame` (ou `Series`) e retorna `Series` (ou `DataFrame`) alinhado ao índice.
+
+## Qualidade
+
+```bash
+python -m ruff check .
+python -m pytest
+python -m build
+```
+
+## Fluxo Para Agentes
+
+- Skills locais: `.agents/skills/`
+- Especificações de feature: `feature_specs/`
+- Templates de scaffold: `templates/`
+- Script de scaffold: `scripts/new_feature.ps1`
+- Script de verificação completa: `scripts/agent_verify.ps1`
+
+Exemplo de scaffold:
+
+```powershell
+scripts/new_feature.ps1 -Module momentum -Feature my_new_feature -DefaultWindow 20
+```
+
+Verificação ponta a ponta:
+
+```powershell
+scripts/agent_verify.ps1
+```

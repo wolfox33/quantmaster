@@ -1,10 +1,11 @@
-import time
-import inspect
 import logging
-import pandas as pd
-import numpy as np
-import pytest
+import time
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
 import quantmaster.features as qf
 
 # Functions that require two series (asset, benchmark)
