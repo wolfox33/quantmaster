@@ -35,6 +35,7 @@ nav:
           - Yang–Zhang Volatility: features/volatility/yang_zhang_volatility.md
           - Bipower Variation: features/volatility/bipower_variation.md
           - Jump Variation: features/volatility/jump_variation.md
+          - Relative Jump Contribution: features/volatility/relative_jump_contribution.md
           - Realized Semivariance: features/volatility/realized_semivariance.md
           - Signed Jump Variation: features/volatility/signed_jump_variation.md
           - MinRV: features/volatility/minrv.md
@@ -105,3 +106,4 @@ nav:
   - Contributing:
       - Agent Workflow: agent-workflow.md
       - Agent Prompts: agent-prompts.md
+      - Feature Status: feature-status.md

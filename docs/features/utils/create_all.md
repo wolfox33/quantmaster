@@ -12,7 +12,8 @@ Quando você está explorando a biblioteca ou construindo um dataset para ML, é
 - Não sobrescreve colunas existentes por padrão (`overwrite=False`).
 - Features que exigem argumentos extras (ex.: `benchmark`) são puladas se você não fornecer.
 - Features com dependências opcionais (ex.: `path_signature_features`) podem ser puladas automaticamente.
-- Você pode controlar o comportamento com `include`, `exclude` e `errors`.
+- Por padrão, executa somente features com status `approved`.
+- Você pode controlar o comportamento com `include`, `exclude`, `include_statuses` e `errors`.
 
 ## Uso
 
@@ -28,6 +29,9 @@ df = create_all(df)
 
 # gerar apenas um subconjunto
 # df = create_all(df, include=["rsi", "har_rv"])
+
+# incluir também features experimentais
+# df = create_all(df, include_statuses=["approved", "experimental"])
 ```
 
 ## API

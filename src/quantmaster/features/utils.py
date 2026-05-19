@@ -6,6 +6,8 @@ from collections.abc import Iterable
 
 import pandas as pd
 
+from quantmaster.feature_status import get_feature_status, normalize_status_filter
+
 DEFAULT_OHLCV_COLUMNS: tuple[str, ...] = ("open", "high", "low", "close", "volume")
 
 DEFAULT_CREATE_ALL_EXCLUDE: set[str] = {"create_all", "har_rv_forecast", "mean_reversion_half_life"}
@@ -56,6 +58,7 @@ def create_all(
     overwrite: bool = False,
     include: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
+    include_statuses: Iterable[str] | None = None,
     errors: str = "ignore",
 ) -> pd.DataFrame:
     if not isinstance(data, pd.DataFrame):
@@ -71,6 +74,7 @@ def create_all(
     include_set = set(include) if include is not None else None
     exclude_set = set(exclude) if exclude is not None else set()
     exclude_set |= DEFAULT_CREATE_ALL_EXCLUDE
+    status_filter = normalize_status_filter(include_statuses)
 
     from quantmaster import features as _features
 
@@ -80,6 +84,8 @@ def create_all(
         if include_set is not None and name not in include_set:
             continue
         if name in exclude_set:
+            continue
+        if status_filter is not None and get_feature_status(name) not in status_filter:
             continue
 
         fn = getattr(_features, name, None)

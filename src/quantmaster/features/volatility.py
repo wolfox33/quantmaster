@@ -337,6 +337,28 @@ def jump_variation(
     return out
 
 
+def relative_jump_contribution(
+    data: pd.DataFrame | pd.Series,
+    *,
+    window: int = 20,
+    price_col: str = "close",
+    log_returns: bool = True,
+    eps: float = 1e-12,
+) -> pd.Series:
+    window = validate_positive_int(window, name="window")
+
+    rv = realized_variance(data, price_col=price_col, log_returns=log_returns).astype(float)
+    bv = bipower_variation(data, price_col=price_col, log_returns=log_returns).astype(float)
+
+    jv = (rv - bv).clip(lower=0.0)
+    rjc = jv / rv.where(rv.abs() > eps)
+    rjc = rjc.clip(lower=0.0, upper=1.0)
+
+    out = rjc.rolling(window).mean()
+    out.name = f"relative_jump_contribution_{window}"
+    return out
+
+
 def realized_semivariance(
     data: pd.DataFrame | pd.Series,
     *,

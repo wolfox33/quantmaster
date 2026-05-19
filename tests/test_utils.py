@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from quantmaster.feature_status import get_feature_status
 from quantmaster.features.utils import create_all
 
 
@@ -65,3 +66,18 @@ def test_create_all_inplace_true_mutates_original_df() -> None:
 
     assert out is df
     assert "rsi_14" in df.columns
+
+
+def test_create_all_default_status_filter_excludes_non_approved() -> None:
+    df = _make_ohlcv(260)
+    out = create_all(df)
+
+    assert get_feature_status("relative_jump_contribution") == "experimental"
+    assert "relative_jump_contribution_20" not in out.columns
+
+
+def test_create_all_can_include_experimental_status() -> None:
+    df = _make_ohlcv(260)
+    out = create_all(df, include=["relative_jump_contribution"], include_statuses=["experimental"])
+
+    assert "relative_jump_contribution_20" in out.columns

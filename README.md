@@ -24,8 +24,11 @@ from quantmaster.features.utils import create_all
 df["rsi_10"] = rsi(df, window=10)
 df = df.join(har_rv(df))
 
-# gerar várias features de uma vez (com defaults)
+# gerar várias features approved de uma vez (com defaults)
 df = create_all(df)
+
+# incluir também features experimentais
+# df = create_all(df, include_statuses=["approved", "experimental"])
 ```
 
 ## Importar features de uma vez

@@ -17,6 +17,7 @@ from quantmaster.features.volatility import (
     realized_roughness,
     realized_semivariance,
     realized_variance,
+    relative_jump_contribution,
     rogers_satchell_volatility,
     shar_components,
     signed_jump_variation,
@@ -24,6 +25,24 @@ from quantmaster.features.volatility import (
     yang_zhang_volatility,
 )
 from tests.helpers import assert_no_lookahead
+
+
+def _assert_no_repaint_series(
+    *,
+    feature_fn,
+    data: pd.DataFrame,
+    feature_kwargs: dict | None = None,
+    cutoff: int,
+) -> None:
+    kwargs = feature_kwargs or {}
+    out1 = feature_fn(data.copy(), **kwargs)
+
+    future_idx = pd.date_range(data.index[-1] + pd.Timedelta(days=1), periods=20, freq="D")
+    future_close = pd.Series(np.linspace(float(data["close"].iloc[-1]), float(data["close"].iloc[-1]) + 5.0, 20), index=future_idx)
+    extended = pd.concat([data, pd.DataFrame({"close": future_close}, index=future_idx)])
+
+    out2 = feature_fn(extended, **kwargs)
+    pd.testing.assert_series_equal(out1.iloc[: cutoff + 1], out2.iloc[: cutoff + 1], check_names=True)
 
 
 def test_realized_variance_shape() -> None:
@@ -89,6 +108,37 @@ def test_jump_variation_shape_name_and_no_lookahead() -> None:
     assert (valid >= 0).all()
 
     assert_no_lookahead(feature_fn=jump_variation, data=df, t=40)
+
+
+def test_relative_jump_contribution_shape_range_no_lookahead_no_repaint() -> None:
+    idx = pd.date_range("2024-01-01", periods=220, freq="D")
+    base = np.linspace(100.0, 130.0, len(idx))
+    noise = np.sin(np.linspace(0.0, 16.0, len(idx))) * 0.8
+    close = pd.Series(base + noise, index=idx, dtype=float)
+    df = pd.DataFrame({"close": close}, index=idx)
+
+    out = relative_jump_contribution(df, window=20)
+
+    assert isinstance(out, pd.Series)
+    assert out.index.equals(df.index)
+    assert out.name == "relative_jump_contribution_20"
+
+    valid = out.dropna()
+    assert (valid >= 0.0).all()
+    assert (valid <= 1.0).all()
+
+    assert_no_lookahead(
+        feature_fn=relative_jump_contribution,
+        data=df,
+        t=120,
+        feature_kwargs={"window": 20},
+    )
+    _assert_no_repaint_series(
+        feature_fn=relative_jump_contribution,
+        data=df,
+        feature_kwargs={"window": 20},
+        cutoff=120,
+    )
 
 
 def test_realized_semivariance_shape_and_no_lookahead() -> None:
