@@ -24,6 +24,7 @@ nav:
           - RSI: features/momentum/rsi.md
           - Time-Series Momentum: features/momentum/time_series_momentum.md
           - Chande Momentum Oscillator: features/momentum/chande_momentum_oscillator.md
+          - Momentum Volatility State: features/momentum/momentum_volatility_state.md
       - Volatility:
           - HAR-RV: features/volatility/har_rv.md
           - HAR-RV Forecast: features/volatility/har_rv_forecast.md

@@ -10,7 +10,12 @@ from quantmaster.features.microstructure import (
     vpin_proxy,
     vwap_deviation,
 )
-from quantmaster.features.momentum import chande_momentum_oscillator, rsi, time_series_momentum
+from quantmaster.features.momentum import (
+    chande_momentum_oscillator,
+    momentum_volatility_state,
+    rsi,
+    time_series_momentum,
+)
 from quantmaster.features.regime import (
     cusum_statistic,
     market_efficiency_index,
@@ -134,6 +139,7 @@ __all__ = [
     "rvol",
     "rsi",
     "chande_momentum_oscillator",
+    "momentum_volatility_state",
     "rolling_beta",
     "path_signature_features",
     "spread_zscore",

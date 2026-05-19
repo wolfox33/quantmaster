@@ -36,6 +36,7 @@ FEATURE_STATUS: dict[str, str] = {
     "mean_reversion_half_life": "approved",
     "medrv": "approved",
     "minrv": "approved",
+    "momentum_volatility_state": "experimental",
     "order_flow_imbalance": "approved",
     "order_flow_imbalance_range": "approved",
     "ornstein_uhlenbeck": "approved",
@@ -96,4 +97,3 @@ def normalize_status_filter(include_statuses: Iterable[str] | None) -> set[str] 
     normalized = {str(s).strip().lower() for s in include_statuses}
     valid = {s for s in normalized if s in _VALID_STATUSES}
     return valid if valid else set()
-
